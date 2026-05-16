@@ -1,0 +1,421 @@
+.wrapper {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.headerIcon {
+  width: 16px;
+  height: 16px;
+  color: var(--color-accent);
+}
+
+.urlRow {
+  display: flex;
+  align-items: stretch;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.methodSelect {
+  padding: 10px 12px;
+  background: var(--color-surface);
+  border: none;
+  border-right: 1px solid var(--color-border);
+  outline: none;
+  font-family: var(--font-code);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--color-text);
+  min-width: 100px;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238B949E' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 28px;
+}
+
+.methodGet { color: var(--color-method-get); }
+.methodPost { color: var(--color-method-post); }
+.methodPut { color: var(--color-method-put); }
+.methodDelete { color: var(--color-method-delete); }
+.methodPatch { color: var(--color-method-patch); }
+
+.urlInput {
+  flex: 1;
+  padding: 10px 14px;
+  background: var(--color-bg);
+  border: none;
+  outline: none;
+  font-family: var(--font-code);
+  font-size: 13px;
+  color: var(--color-text);
+}
+
+.urlInput:focus {
+  box-shadow: inset 0 0 0 1px var(--color-accent);
+}
+
+.section {
+  border-bottom: 1px solid var(--color-border);
+}
+
+.section:last-child {
+  border-bottom: none;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  cursor: pointer;
+  background: var(--color-surface);
+  transition: background var(--transition-fast);
+  user-select: none;
+}
+
+.sectionHeader:hover {
+  background: var(--color-surface-hover);
+}
+
+.sectionHeaderLeft {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.sectionChevron {
+  width: 14px;
+  height: 14px;
+  color: var(--color-text-secondary);
+  transition: transform var(--transition-fast);
+}
+
+.sectionChevronOpen {
+  transform: rotate(90deg);
+}
+
+.badge {
+  font-family: var(--font-code);
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: var(--color-accent-dim);
+  color: var(--color-accent);
+  min-width: 18px;
+  text-align: center;
+}
+
+.sectionBody {
+  padding: 12px 16px;
+}
+
+.kvRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.kvRow:last-child {
+  margin-bottom: 0;
+}
+
+.kvCheckbox {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--color-accent);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.kvInput {
+  flex: 1;
+  padding: 6px 10px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-code);
+  font-size: 12px;
+  color: var(--color-text);
+  outline: none;
+  transition: border-color var(--transition-fast);
+}
+
+.kvInput:focus {
+  border-color: var(--color-accent);
+}
+
+.kvInput:disabled {
+  opacity: 0.4;
+}
+
+.kvKeyInput {
+  max-width: 200px;
+}
+
+.kvDeleteBtn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.kvDeleteBtn:hover {
+  background: rgba(248, 81, 73, 0.1);
+  border-color: rgba(248, 81, 73, 0.3);
+  color: var(--color-error);
+}
+
+.kvDeleteIcon {
+  width: 14px;
+  height: 14px;
+}
+
+.addBtn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: transparent;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  margin-top: 8px;
+}
+
+.addBtn:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  background: var(--color-accent-dim);
+}
+
+.addBtnIcon {
+  width: 14px;
+  height: 14px;
+}
+
+.bodyTabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.bodyTab {
+  padding: 8px 16px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.bodyTab:hover {
+  color: var(--color-text);
+  background: var(--color-surface-hover);
+}
+
+.bodyTabActive {
+  color: var(--color-accent);
+  border-bottom-color: var(--color-accent);
+}
+
+.bodyContent {
+  padding: 12px 16px;
+}
+
+.bodyTextarea {
+  width: 100%;
+  min-height: 120px;
+  padding: 12px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-code);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--color-text);
+  outline: none;
+  resize: vertical;
+  transition: border-color var(--transition-fast);
+}
+
+.bodyTextarea:focus {
+  border-color: var(--color-accent);
+}
+
+.bodyToolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+}
+
+.formatBtn {
+  padding: 4px 10px;
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.formatBtn:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.authTypeRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.authLabel {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  min-width: 60px;
+}
+
+.authSelect {
+  padding: 6px 10px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  color: var(--color-text);
+  outline: none;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238B949E' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  padding-right: 26px;
+}
+
+.authSelect:focus {
+  border-color: var(--color-accent);
+}
+
+.authField {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.authFieldLabel {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  min-width: 60px;
+}
+
+.authFieldInput {
+  flex: 1;
+  padding: 6px 10px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-code);
+  font-size: 12px;
+  color: var(--color-text);
+  outline: none;
+  transition: border-color var(--transition-fast);
+}
+
+.authFieldInput:focus {
+  border-color: var(--color-accent);
+}
+
+.generateRow {
+  padding: 16px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.generateBtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 24px;
+  background: var(--color-accent);
+  color: #0D1117;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.generateBtn:hover {
+  background: #00cc8e;
+  box-shadow: 0 0 16px rgba(0, 229, 160, 0.3);
+  transform: translateY(-1px);
+}
+
+.generateBtn:active {
+  transform: translateY(0);
+}
+
+.generateBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.generateBtnIcon {
+  width: 16px;
+  height: 16px;
+}
+
+.emptyBody {
+  padding: 24px 16px;
+  text-align: center;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+}
