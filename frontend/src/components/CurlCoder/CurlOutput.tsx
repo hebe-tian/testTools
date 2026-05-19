@@ -24,9 +24,6 @@ export default function CurlOutput({ curlText, onRegenerate }: CurlOutputProps) 
 
   useEffect(() => {
     if (codeRef.current && curlText) {
-      const grammar = shellMode === 'powershell'
-        ? Prism.languages.powershell
-        : Prism.languages.bash;
       Prism.highlightElement(codeRef.current, false, () => {
         // highlight complete
       });
