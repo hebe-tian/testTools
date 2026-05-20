@@ -4,7 +4,6 @@ __pycache__/
 *$py.class
 *.so
 *.egg-info/
-dist/
 build/
 .eggs/
 *.egg
@@ -40,7 +39,6 @@ Thumbs.db
 .env.*.local
 
 # Build output
-frontend/dist/
 backend/dist/
 
 # Trae internal
