@@ -7,9 +7,9 @@ testTools 采用前后端分离部署方案，支持多种平台组合。
 ## 目录
 
 - [方案一：Vercel (前端) + PythonAnywhere (后端)](#方案一vercel-前端--pythonanywhere-后端)
-- [方案二：Cloudflare Pages (前端) + Cloudflare Workers (后端)](#方案二cloudflare-pages-前端--cloudflare-workers-后端)
-- [方案三：全部部署到 Vercel (Serverless)](#方案三全部部署到-vercel-serverless)
-- [方案四：全部部署到 PythonAnywhere]((#方案四全部部署到-pythonanywhere)
+- [方案二：全部部署到 Vercel (Serverless)](#方案二全部部署到-vercel-serverless)
+- [方案三：全部部署到 PythonAnywhere](#方案三全部部署到-pythonanywhere)
+- [方案四：Cloudflare 部署](#方案四cloudflare-部署)
 - [环境变量汇总](#环境变量汇总)
 - [更新部署](#更新部署)
 
@@ -71,32 +71,9 @@ application = ASGIMiddleware(app)
 
 > 将 `<your-username>` 替换为你的 PythonAnywhere 用户名。
 
-#### 6. 配置 Virtualenv
-
-在 **Web** 选项卡的 **Virtualenv** 部分，填入：
-
-```
-/home/<your-username>/testTools/backend/venv
-```
-
-#### 7. 重载应用
+#### 6. 重载应用
 
 点击 **Web** 选项卡顶部绿色的 **Reload** 按钮。
-
-#### 8. 验证后端可访问
-
-在浏览器中访问以下 URL，确认后端正常运行：
-
-| URL | 预期结果 |
-|-----|---------|
-| `https://<your-username>.pythonanywhere.com/health` | `{"status":"ok"}` |
-| `https://<your-username>.pythonanywhere.com/docs` | FastAPI 自动文档页面 |
-| `https://<your-username>.pythonanywhere.com/api/v1/curl/parse` | `{"detail":"Method Not Allowed"}`（正常，需要 POST） |
-
-> **常见问题排查**：
-> - 如果返回 502 错误：检查 WSGI 文件路径和虚拟环境路径是否正确
-> - 如果返回 500 错误：在 Web 选项卡查看错误日志（Server log / Error log）
-> - 如果修改了代码但没生效：必须点击 **Reload** 按钮重载应用
 
 ---
 
@@ -129,150 +106,7 @@ os.environ['ALLOWED_ORIGINS'] = 'https://testtools-xxx.vercel.app,http://localho
 
 ---
 
-## 方案二：Cloudflare Pages (前端) + Cloudflare Workers (后端)
-
-Cloudflare 提供全球边缘网络，延迟低，免费额度充足。
-
-### 第一步：部署后端到 Cloudflare Workers
-
-Cloudflare Workers 原生支持 Python，可以直接运行 FastAPI。
-
-#### 1. 安装前置工具
-
-```bash
-# 安装 uv（Python 包管理器）
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# 安装 Node.js（需要 18+）
-# 参见 https://nodejs.org/
-```
-
-#### 2. 创建 Workers 项目
-
-在项目根目录创建 `worker/` 目录：
-
-```bash
-mkdir -p worker
-cd worker
-```
-
-创建 `worker/pyproject.toml`：
-
-```toml
-[project]
-name = "testtools-worker"
-version = "0.1.0"
-description = "testTools backend on Cloudflare Workers"
-requires-python = ">=3.12"
-dependencies = [
-    "fastapi",
-    "pydantic",
-]
-
-[dependency-groups]
-dev = [
-    "workers-py",
-    "workers-runtime-sdk",
-]
-```
-
-创建 `worker/src/entry.py`：
-
-```python
-from workers import WorkerEntrypoint, Response
-import json
-
-class Default(WorkerEntrypoint):
-    async def fetch(self, request):
-        url = str(request.url)
-
-        if url.endswith("/health"):
-            return Response(json.dumps({"status": "ok"}), headers={"Content-Type": "application/json"})
-
-        if url.endswith("/api/v1/curl/parse") and request.method == "POST":
-            body = await request.json()
-            curl_text = body.get("curl_text", "")
-            from app.services.curl_parser import parse
-            try:
-                result = parse(curl_text)
-                return Response(result.model_dump_json(), headers={"Content-Type": "application/json"})
-            except Exception as e:
-                return Response(json.dumps({"detail": str(e)}), status=400, headers={"Content-Type": "application/json"})
-
-        if url.endswith("/api/v1/curl/generate") and request.method == "POST":
-            body = await request.json()
-            from app.utils.curl_generator import generate
-            from app.models.curl import CurlGenerateRequest
-            try:
-                req = CurlGenerateRequest(**body)
-                result = generate(req)
-                return Response(json.dumps({"curl_text": result, "shell_mode": req.shell_mode}), headers={"Content-Type": "application/json"})
-            except Exception as e:
-                return Response(json.dumps({"detail": str(e)}), status=400, headers={"Content-Type": "application/json"})
-
-        return Response("Not Found", status=404)
-```
-
-创建 `worker/wrangler.toml`：
-
-```toml
-name = "testtools-backend"
-main = "src/entry.py"
-compatibility_flags = ["python_workers"]
-compatibility_date = "2024-01-01"
-```
-
-#### 3. 本地测试
-
-```bash
-cd worker
-uv run pywrangler dev
-```
-
-#### 4. 部署到 Cloudflare
-
-```bash
-uv run pywrangler deploy
-```
-
-部署成功后会输出 Worker URL，如 `https://testtools-backend.<your-subdomain>.workers.dev`。
-
-> **注意**：Cloudflare Workers Python 仍处于 Beta 阶段。如果遇到兼容性问题，可以使用方案二（备选）：将后端部署为 Cloudflare Workers 的 JavaScript 版本，通过 `fetch` 调用外部 FastAPI 服务。
-
-### 第二步：部署前端到 Cloudflare Pages
-
-#### 1. 通过 GitHub 集成部署（推荐）
-
-1. 登录 https://dash.cloudflare.com
-2. 进入 **Workers & Pages** → **Create** → **Pages** → **Connect to Git**
-3. 选择 `testTools` 仓库
-4. 配置：
-   - **Production branch**: `main`
-   - **Build command**: `cd frontend && npm install && npm run build`
-   - **Build output directory**: `frontend/dist`
-   - **Environment variables**:
-     - `VITE_API_BASE_URL` = `https://testtools-backend.<your-subdomain>.workers.dev`
-5. 点击 **Save and Deploy**
-
-#### 2. 通过 CLI 部署
-
-```bash
-cd frontend
-npm run build
-npx wrangler pages deploy dist --project-name=testtools
-```
-
-#### 3. 更新后端 CORS
-
-在 Cloudflare Workers 的 `wrangler.toml` 中添加环境变量，或在 Cloudflare Dashboard 的 Workers 设置中添加：
-
-```
-ALLOWED_ORIGINS=https://testtools.pages.dev
-```
-
----
-
-## 方案三：全部部署到 Vercel (Serverless)
+## 方案二：全部部署到 Vercel (Serverless)
 
 Vercel 支持 Serverless Functions，可以用 Python 运行 FastAPI 后端。
 
@@ -325,7 +159,7 @@ vercel --prod
 
 ---
 
-## 方案四：全部部署到 PythonAnywhere
+## 方案三：全部部署到 PythonAnywhere
 
 将前端构建为静态文件，由 PythonAnywhere 托管。
 
@@ -383,6 +217,20 @@ application = ASGIMiddleware(app)
 
 ---
 
+## 方案四：Cloudflare 部署
+
+Cloudflare 提供全球边缘网络，延迟低，免费额度充足。前端使用 Cloudflare Pages，后端使用 Cloudflare Workers，全部基于 GitHub 集成自动部署。
+
+> 详细的操作步骤（包括每个按钮的位置、具体链接等）请参考 **[Cloudflare 部署指南](cloudflare-deployment.md)**。
+
+简要流程：
+
+1. **后端**：创建 `worker/` 目录和配置文件 → 在 Cloudflare Dashboard 导入 GitHub 仓库 → 推送代码自动部署到 Workers
+2. **前端**：在 Cloudflare Pages 中连接 GitHub 仓库 → 推送代码自动构建部署
+3. **配置 CORS**：Worker 代码中已内置跨域响应头
+
+---
+
 ## 环境变量汇总
 
 | 变量 | 位置 | 说明 | 示例 |
@@ -416,10 +264,8 @@ vercel --prod
 
 ### Cloudflare 更新
 
-```bash
-# 前端（Pages 自动部署，或手动）
-cd frontend && npm run build && npx wrangler pages deploy dist --project-name=testtools
+推送代码到 GitHub 即可自动部署，无需手动操作。
 
-# 后端（Workers）
-cd worker && uv run pywrangler deploy
+```bash
+git add . && git commit -m "更新描述" && git push origin main
 ```
