@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import type {
   ParsedCurl,
   QueryParam,
@@ -136,6 +136,28 @@ export default function ParsedView({ data, onGenerate, loading }: ParsedViewProp
   const toggleSection = useCallback((key: string) => {
     setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
   }, []);
+
+  useEffect(() => {
+    setMethod(data.method);
+    setUrl(data.url);
+    setQueryParams(data.query_params);
+    setHeaders(data.headers);
+    setCookies(data.cookies);
+    setBody(data.body);
+    setAuth(data.auth);
+    setOpenSections({
+      params: data.query_params.length > 0,
+      headers: data.headers.length > 0,
+      cookies: data.cookies.length > 0,
+      body: data.body !== null,
+      auth: data.auth !== null && data.auth.auth_type !== 'none',
+    });
+    if (data.body) {
+      if (data.body.content_type === 'application/json') setBodyTab('json');
+      else if (data.body.content_type === 'multipart/form-data' || data.body.content_type === 'application/x-www-form-urlencoded') setBodyTab('form');
+      else setBodyTab('raw');
+    }
+  }, [data]);
 
   const handleGenerate = useCallback(() => {
     const req: CurlGenerateRequest = {

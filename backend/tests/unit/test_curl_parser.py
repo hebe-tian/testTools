@@ -309,7 +309,8 @@ class TestParsePowerShellChrome:
         curl_text = (
             "Invoke-WebRequest -UseBasicParsing -Uri \"https://api.example.com\" `\n"
             " -Headers @{\n"
-            "\"sec-ch-ua\"=\"\\\"Chromium\\\";v=\\\"148\\\", \\\"Google Chrome\\\";v=\\\"148\\\"\"\n"
+            "\"sec-ch-ua\"=\"\\\"Chromium\\\";v=\\\"148\\\", "
+            "\\\"Google Chrome\\\";v=\\\"148\\\"\"\n"
             "\"sec-ch-ua-mobile\"=\"?0\"\n"
             "\"sec-ch-ua-platform\"=\"\\\"macOS\\\"\"\n"
             "}"
@@ -389,6 +390,90 @@ class TestParsePowerShellChrome:
         )
         result = parse(curl_text)
         assert len(result.headers) == 3
+
+    def test_chrome_ps_backtick_escape_in_uri(self) -> None:
+        curl_text = (
+            "Invoke-WebRequest -UseBasicParsing -Uri \" `https://api.example.com/users` \" `\n"
+            " -Method \"GET\""
+        )
+        result = parse(curl_text)
+        assert "https://api.example.com/users" in result.url
+        assert "`" not in result.url
+
+    def test_chrome_ps_backtick_escape_in_header_value(self) -> None:
+        curl_text = (
+            "Invoke-WebRequest -UseBasicParsing -Uri \"https://api.example.com\" `\n"
+            " -Headers @{\n"
+            "\"sec-ch-ua\"=\"`\"Chromium`\";v=`\"148`\"\"\n"
+            "\"sec-ch-ua-platform\"=\"`\"macOS`\"\"\n"
+            "}"
+        )
+        result = parse(curl_text)
+        sec_ua = next(h for h in result.headers if h.key == "sec-ch-ua")
+        assert "`" not in sec_ua.value
+        assert '"Chromium"' in sec_ua.value
+        platform = next(h for h in result.headers if h.key == "sec-ch-ua-platform")
+        assert "`" not in platform.value
+        assert '"macOS"' in platform.value
+
+    def test_chrome_ps_backtick_escape_in_body(self) -> None:
+        curl_text = (
+            "Invoke-WebRequest -UseBasicParsing -Uri \"https://api.example.com\" `\n"
+            " -Method \"POST\" `\n"
+            " -ContentType \"application/json\" `\n"
+            " -Body '{`\"key`\":`\"value`\"}'"
+        )
+        result = parse(curl_text)
+        assert result.body is not None
+        assert "`" not in result.body.raw
+        assert result.body.json_data == {"key": "value"}
+
+    def test_chrome_ps_backtick_escape_dollar_sign(self) -> None:
+        curl_text = (
+            "Invoke-WebRequest -UseBasicParsing -Uri \"https://api.example.com\" `\n"
+            " -Headers @{\n"
+            "\"X-Custom\"=\"price is `$100\"\n"
+            "}"
+        )
+        result = parse(curl_text)
+        custom = next(h for h in result.headers if h.key == "X-Custom")
+        assert custom.value == "price is $100"
+
+    def test_chrome_ps_full_chrome_format(self) -> None:
+        curl_text = (
+            "$session = New-Object "
+            "Microsoft.PowerShell.Commands.WebRequestSession\n"
+            "$session.UserAgent = \"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+            "AppleWebKit/537.36\"\n"
+            "Invoke-WebRequest -UseBasicParsing "
+            "-Uri \" `https://hebetian.pythonanywhere.com/api/v1/curl/parse` \" `\n"
+            " -Method \"POST\" `\n"
+            " -WebSession $session `\n"
+            " -Headers @{\n"
+            "\"Accept\"=\"*/*\"\n"
+            "\"Accept-Encoding\"=\"gzip, deflate, br, zstd\"\n"
+            "\"Accept-Language\"=\"zh-CN,zh;q=0.9,en;q=0.8\"\n"
+            "\"Cache-Control\"=\"no-cache\"\n"
+            "\"Origin\"=\" `https://hebetian.pythonanywhere.com` \"\n"
+            "\"Referer\"=\" `https://hebetian.pythonanywhere.com/tools/curl-coder` \"\n"
+            "\"sec-ch-ua\"=\"`\"Chromium`\";v=`\"148`\", "
+            "`\"Google Chrome`\";v=`\"148`\", `\"Not/A)Brand`\";v=`\"99`\"\"\n"
+            "\"sec-ch-ua-mobile\"=\"?0\"\n"
+            "\"sec-ch-ua-platform\"=\"`\"macOS`\"\"\n"
+            "} `\n"
+            " -ContentType \"application/json\" `\n"
+            " -Body '{`\"curl_text`\":`\"111`\"}'"
+        )
+        result = parse(curl_text)
+        assert result.method == "POST"
+        assert "hebetian.pythonanywhere.com" in result.url
+        assert "`" not in result.url
+        assert result.body is not None
+        assert "`" not in result.body.raw
+        assert result.body.json_data == {"curl_text": "111"}
+        sec_ua = next((h for h in result.headers if h.key == "sec-ch-ua"), None)
+        assert sec_ua is not None
+        assert "`" not in sec_ua.value
 
 
 class TestParseCmd:

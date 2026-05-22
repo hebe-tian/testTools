@@ -247,6 +247,52 @@ def _strip_quotes(value: str) -> str:
     return value
 
 
+def _unescape_powershell(value: str) -> str:
+    """处理 PowerShell 反引号转义序列。
+
+    PowerShell 反引号转义规则：
+    - `" → 双引号
+    - `$ → 美元符号
+    - `` → 反引号本身
+    - `n → 换行
+    - `t → 制表符
+    - `r → 回车
+    - 其他 `X → X（反引号被移除）
+
+    Args:
+        value: 包含 PowerShell 转义序列的字符串
+
+    Returns:
+        处理转义后的字符串
+    """
+    result: list[str] = []
+    i = 0
+    while i < len(value):
+        if value[i] == "`" and i + 1 < len(value):
+            next_char = value[i + 1]
+            escape_map = {
+                '"': '"',
+                "'": "'",
+                "$": "$",
+                "`": "`",
+                "n": "\n",
+                "t": "\t",
+                "r": "\r",
+                "\\": "\\",
+                "0": "\0",
+                "a": "\a",
+                "b": "\b",
+                "f": "\f",
+                "v": "\v",
+            }
+            result.append(escape_map.get(next_char, next_char))
+            i += 2
+        else:
+            result.append(value[i])
+            i += 1
+    return "".join(result)
+
+
 def _parse_url_query(url: str) -> tuple[str, list[QueryParam]]:
     """从 URL 中提取 base_url 和查询参数。
 
@@ -544,13 +590,13 @@ def _parse_powershell(curl_text: str) -> ParsedCurl:
         if arg == "-Method":
             i += 1
             if i < len(args):
-                method = args[i].strip("'\"").upper()
+                method = _unescape_powershell(args[i].strip("'\"")).upper()
 
         # -Uri: 请求 URL
         elif arg == "-Uri":
             i += 1
             if i < len(args):
-                url = _strip_quotes(args[i])
+                url = _unescape_powershell(_strip_quotes(args[i]))
 
         # -Headers: 请求头（PowerShell 哈希表格式）
         elif arg == "-Headers":
@@ -562,7 +608,7 @@ def _parse_powershell(curl_text: str) -> ParsedCurl:
         elif arg == "-Body":
             i += 1
             if i < len(args):
-                body_raw = _strip_quotes(args[i])
+                body_raw = _unescape_powershell(_strip_quotes(args[i]))
                 if method == "GET":
                     method = "POST"
 
@@ -570,7 +616,7 @@ def _parse_powershell(curl_text: str) -> ParsedCurl:
         elif arg == "-ContentType":
             i += 1
             if i < len(args):
-                body_content_type = _strip_quotes(args[i])
+                body_content_type = _unescape_powershell(_strip_quotes(args[i]))
 
         # -Cookie / -WebSession: Cookie（简化处理，-WebSession 跳过变量引用）
         elif arg in ("-Cookie", "-WebSession", "-UseBasicParsing"):
@@ -645,14 +691,14 @@ def _parse_powershell_headers(header_arg: str) -> list[HeaderItem]:
     # 将换行统一替换为分号，兼容 Chrome 的换行分隔格式
     inner = inner.replace("\n", ";")
 
-    # 按分号拆分，但跳过引号内的分号
+    # 按分号拆分，跳过引号内的分号，同时正确处理反引号转义引号
     pairs = _split_respecting_quotes(inner, ";")
     for pair in pairs:
         pair = pair.strip()
         if "=" in pair:
             key, _, value = pair.partition("=")
-            key = key.strip().strip("'\"")
-            value = value.strip().strip("'\"")
+            key = _unescape_powershell(_strip_outer_quotes(key.strip()))
+            value = _unescape_powershell(_strip_outer_quotes(value.strip()))
             if key:
                 headers.append(HeaderItem(key=key, value=value))
 
@@ -661,6 +707,8 @@ def _parse_powershell_headers(header_arg: str) -> list[HeaderItem]:
 
 def _split_respecting_quotes(text: str, delimiter: str) -> list[str]:
     """按分隔符拆分字符串，但跳过引号内的分隔符。
+
+    同时处理 PowerShell 反引号转义：`" 不视为引号边界。
 
     Args:
         text: 待拆分的字符串
@@ -677,6 +725,11 @@ def _split_respecting_quotes(text: str, delimiter: str) -> list[str]:
     i = 0
     while i < len(text):
         char = text[i]
+
+        if char == "`" and i + 1 < len(text):
+            current += char + text[i + 1]
+            i += 2
+            continue
 
         if char == "'" and not in_double:
             in_single = not in_single
@@ -697,3 +750,18 @@ def _split_respecting_quotes(text: str, delimiter: str) -> list[str]:
         parts.append(current.strip())
 
     return parts
+
+
+def _strip_outer_quotes(text: str) -> str:
+    """只剥离一对匹配的外层引号，不贪婪删除。
+
+    Args:
+        text: 待处理的字符串
+
+    Returns:
+        剥离外层引号后的字符串
+    """
+    if len(text) >= 2:
+        if (text[0] == '"' and text[-1] == '"') or (text[0] == "'" and text[-1] == "'"):
+            return text[1:-1]
+    return text
