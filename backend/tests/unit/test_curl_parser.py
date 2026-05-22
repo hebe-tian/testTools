@@ -213,6 +213,183 @@ class TestParsePowerShell:
         assert result.body is not None
         assert result.shell_mode == "powershell"
 
+    def test_chrome_powershell_with_session_variable(self) -> None:
+        curl_text = (
+            "$session = New-Object Microsoft.PowerShell.Commands.WebRequestSession\n"
+            "$session.UserAgent = \"Mozilla/5.0\"\n"
+            "Invoke-WebRequest -UseBasicParsing -Uri \"https://api.example.com/users\" `\n"
+            " -Method \"POST\" `\n"
+            " -WebSession $session `\n"
+            " -Headers @{\n"
+            "\"Accept\"=\"*/*\"\n"
+            "\"Content-Type\"=\"application/json\"\n"
+            "} `\n"
+            " -ContentType \"application/json\" `\n"
+            " -Body '{\"name\": \"test\"}'"
+        )
+        result = parse(curl_text)
+        assert result.method == "POST"
+        assert result.url == "https://api.example.com/users"
+        assert result.shell_mode == "powershell"
+        assert len(result.headers) >= 2
+        assert any(h.key == "Accept" for h in result.headers)
+        assert any(h.key == "Content-Type" for h in result.headers)
+        assert result.body is not None
+
+
+class TestParsePowerShellChrome:
+    """Chrome 复制的 PowerShell 格式解析。
+
+    Chrome DevTools 复制为 PowerShell 时，格式特征：
+    - 以 $session 变量赋值开头
+    - 使用 Invoke-WebRequest
+    - -UseBasicParsing 参数
+    - -WebSession $session 引用变量
+    - -Headers 使用换行分隔的哈希表
+    - 反引号 ` 作为续行符
+    """
+
+    def test_chrome_ps_get_request(self) -> None:
+        curl_text = (
+            "$session = New-Object Microsoft.PowerShell.Commands.WebRequestSession\n"
+            "Invoke-WebRequest -UseBasicParsing -Uri \"https://api.example.com/users\" `\n"
+            " -Method \"GET\" `\n"
+            " -WebSession $session `\n"
+            " -Headers @{\n"
+            "\"Accept\"=\"application/json\"\n"
+            "}"
+        )
+        result = parse(curl_text)
+        assert result.method == "GET"
+        assert result.url == "https://api.example.com/users"
+        assert result.shell_mode == "powershell"
+        assert any(h.key == "Accept" for h in result.headers)
+
+    def test_chrome_ps_post_with_json_body(self) -> None:
+        curl_text = (
+            "$session = New-Object Microsoft.PowerShell.Commands.WebRequestSession\n"
+            "Invoke-WebRequest -UseBasicParsing -Uri \"https://api.example.com/users\" `\n"
+            " -Method \"POST\" `\n"
+            " -WebSession $session `\n"
+            " -Headers @{\n"
+            "\"Content-Type\"=\"application/json\"\n"
+            "} `\n"
+            " -ContentType \"application/json\" `\n"
+            " -Body '{\"name\": \"test\"}'"
+        )
+        result = parse(curl_text)
+        assert result.method == "POST"
+        assert result.url == "https://api.example.com/users"
+        assert result.body is not None
+        assert result.body.content_type == "application/json"
+        assert result.body.json_data == {"name": "test"}
+
+    def test_chrome_ps_multiple_headers_newline_separated(self) -> None:
+        curl_text = (
+            "Invoke-WebRequest -UseBasicParsing -Uri \"https://api.example.com\" `\n"
+            " -Headers @{\n"
+            "\"Accept\"=\"*/*\"\n"
+            "\"Accept-Encoding\"=\"gzip, deflate, br, zstd\"\n"
+            "\"Accept-Language\"=\"zh-CN,zh;q=0.9,en;q=0.8\"\n"
+            "\"Cache-Control\"=\"no-cache\"\n"
+            "\"Origin\"=\"https://example.com\"\n"
+            "}"
+        )
+        result = parse(curl_text)
+        assert result.url == "https://api.example.com"
+        header_keys = [h.key for h in result.headers]
+        assert "Accept" in header_keys
+        assert "Accept-Encoding" in header_keys
+        assert "Accept-Language" in header_keys
+        assert "Cache-Control" in header_keys
+        assert "Origin" in header_keys
+        assert len(result.headers) == 5
+
+    def test_chrome_ps_header_with_special_chars(self) -> None:
+        curl_text = (
+            "Invoke-WebRequest -UseBasicParsing -Uri \"https://api.example.com\" `\n"
+            " -Headers @{\n"
+            "\"sec-ch-ua\"=\"\\\"Chromium\\\";v=\\\"148\\\", \\\"Google Chrome\\\";v=\\\"148\\\"\"\n"
+            "\"sec-ch-ua-mobile\"=\"?0\"\n"
+            "\"sec-ch-ua-platform\"=\"\\\"macOS\\\"\"\n"
+            "}"
+        )
+        result = parse(curl_text)
+        header_keys = [h.key for h in result.headers]
+        assert "sec-ch-ua" in header_keys
+        assert "sec-ch-ua-mobile" in header_keys
+        assert "sec-ch-ua-platform" in header_keys
+
+    def test_chrome_ps_usebasicparsing_ignored(self) -> None:
+        curl_text = (
+            "Invoke-WebRequest -UseBasicParsing -Uri \"https://api.example.com\""
+        )
+        result = parse(curl_text)
+        assert result.url == "https://api.example.com"
+        assert result.method == "GET"
+
+    def test_chrome_ps_websession_variable_skipped(self) -> None:
+        curl_text = (
+            "$session = New-Object Microsoft.PowerShell.Commands.WebRequestSession\n"
+            "Invoke-WebRequest -UseBasicParsing -Uri \"https://api.example.com\" `\n"
+            " -WebSession $session"
+        )
+        result = parse(curl_text)
+        assert result.url == "https://api.example.com"
+
+    def test_chrome_ps_with_contenttype_and_body(self) -> None:
+        curl_text = (
+            "Invoke-WebRequest -UseBasicParsing -Uri \"https://api.example.com/data\" `\n"
+            " -Method \"POST\" `\n"
+            " -Headers @{\n"
+            "\"Accept\"=\"*/*\"\n"
+            "} `\n"
+            " -ContentType \"application/json\" `\n"
+            " -Body '{\"key\": \"value\"}'"
+        )
+        result = parse(curl_text)
+        assert result.method == "POST"
+        assert result.body is not None
+        assert result.body.content_type == "application/json"
+        assert result.body.json_data == {"key": "value"}
+
+    def test_chrome_ps_detect_shell_with_session_prefix(self) -> None:
+        from app.services.curl_parser import detect_shell
+
+        curl_text = (
+            "$session = New-Object Microsoft.PowerShell.Commands.WebRequestSession\n"
+            "Invoke-WebRequest -Uri \"https://api.example.com\""
+        )
+        assert detect_shell(curl_text) == "powershell"
+
+    def test_chrome_ps_backtick_continuation(self) -> None:
+        curl_text = (
+            "Invoke-WebRequest `\n"
+            " -Uri \"https://api.example.com\" `\n"
+            " -Method \"GET\""
+        )
+        result = parse(curl_text)
+        assert result.url == "https://api.example.com"
+        assert result.method == "GET"
+
+    def test_chrome_ps_semicolon_separated_headers(self) -> None:
+        curl_text = (
+            "Invoke-WebRequest -Uri \"https://api.example.com\" "
+            "-Headers @{'Accept'='application/json'; 'Cache-Control'='no-cache'}"
+        )
+        result = parse(curl_text)
+        assert len(result.headers) == 2
+        assert result.headers[0].key == "Accept"
+        assert result.headers[1].key == "Cache-Control"
+
+    def test_chrome_ps_mixed_header_separators(self) -> None:
+        curl_text = (
+            "Invoke-WebRequest -Uri \"https://api.example.com\" "
+            "-Headers @{'Accept'='application/json'; 'Cache-Control'='no-cache'; 'Origin'='https://example.com'}"
+        )
+        result = parse(curl_text)
+        assert len(result.headers) == 3
+
 
 class TestParseCmd:
     """CMD 格式解析。"""

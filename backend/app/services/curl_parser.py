@@ -363,11 +363,11 @@ def parse(curl_text: str) -> ParsedCurl:
     stripped = curl_text.strip()
     if not (
         stripped.startswith("curl")
-        or stripped.startswith("Invoke-WebRequest")
-        or stripped.startswith("Invoke-RestMethod")
+        or "Invoke-WebRequest" in stripped
+        or "Invoke-RestMethod" in stripped
     ):
         raise ValueError(
-            "无效的 curl 命令：必须以 curl、Invoke-WebRequest 或 Invoke-RestMethod 开头"
+            "无效的 curl 命令：必须包含 curl、Invoke-WebRequest 或 Invoke-RestMethod"
         )
 
     # 检测 shell 类型
@@ -522,8 +522,10 @@ def _parse_powershell(curl_text: str) -> ParsedCurl:
     text = curl_text.strip()
     # 移除续行符
     text = re.sub(r"`\s*\n", " ", text)
-    # 移除命令前缀
-    text = re.sub(r"^\s*Invoke-(?:WebRequest|RestMethod)\s*", "", text)
+    # 找到 Invoke-WebRequest / Invoke-RestMethod 的位置，移除之前的变量赋值
+    match = re.search(r"Invoke-(?:WebRequest|RestMethod)\s*", text)
+    if match:
+        text = text[match.end():]
 
     method = "GET"
     url = ""
@@ -570,12 +572,15 @@ def _parse_powershell(curl_text: str) -> ParsedCurl:
             if i < len(args):
                 body_content_type = _strip_quotes(args[i])
 
-        # -Cookie / -Session: Cookie（简化处理）
-        elif arg in ("-Cookie", "-WebSession"):
-            i += 1
-            if i < len(args):
-                cookie_str = _strip_quotes(args[i])
-                cookies = _parse_cookie_string(cookie_str)
+        # -Cookie / -WebSession: Cookie（简化处理，-WebSession 跳过变量引用）
+        elif arg in ("-Cookie", "-WebSession", "-UseBasicParsing"):
+            if arg == "-Cookie":
+                i += 1
+                if i < len(args):
+                    cookie_str = _strip_quotes(args[i])
+                    cookies = _parse_cookie_string(cookie_str)
+            elif arg == "-WebSession":
+                i += 1
 
         i += 1
 
@@ -621,7 +626,10 @@ def _parse_powershell(curl_text: str) -> ParsedCurl:
 def _parse_powershell_headers(header_arg: str) -> list[HeaderItem]:
     """解析 PowerShell 哈希表格式的请求头。
 
-    格式示例: @{'Content-Type'='application/json'; 'Accept'='text/html'}
+    格式示例:
+    - 分号分隔: @{'Content-Type'='application/json'; 'Accept'='text/html'}
+    - 换行分隔（Chrome 格式）: @{"Content-Type"="application/json"
+        "Accept"="text/html"}
 
     Args:
         header_arg: PowerShell 哈希表字符串
@@ -630,13 +638,15 @@ def _parse_powershell_headers(header_arg: str) -> list[HeaderItem]:
         HeaderItem 列表
     """
     headers: list[HeaderItem] = []
-    # 去除 @{ 和 }
     inner = header_arg.strip()
     if inner.startswith("@{") and inner.endswith("}"):
         inner = inner[2:-1]
 
-    # 按分号拆分键值对
-    pairs = inner.split(";")
+    # 将换行统一替换为分号，兼容 Chrome 的换行分隔格式
+    inner = inner.replace("\n", ";")
+
+    # 按分号拆分，但跳过引号内的分号
+    pairs = _split_respecting_quotes(inner, ";")
     for pair in pairs:
         pair = pair.strip()
         if "=" in pair:
@@ -647,3 +657,43 @@ def _parse_powershell_headers(header_arg: str) -> list[HeaderItem]:
                 headers.append(HeaderItem(key=key, value=value))
 
     return headers
+
+
+def _split_respecting_quotes(text: str, delimiter: str) -> list[str]:
+    """按分隔符拆分字符串，但跳过引号内的分隔符。
+
+    Args:
+        text: 待拆分的字符串
+        delimiter: 分隔符
+
+    Returns:
+        拆分后的字符串列表
+    """
+    parts: list[str] = []
+    current = ""
+    in_single = False
+    in_double = False
+
+    i = 0
+    while i < len(text):
+        char = text[i]
+
+        if char == "'" and not in_double:
+            in_single = not in_single
+            current += char
+        elif char == '"' and not in_single:
+            in_double = not in_double
+            current += char
+        elif char == delimiter and not in_single and not in_double:
+            if current.strip():
+                parts.append(current.strip())
+            current = ""
+        else:
+            current += char
+
+        i += 1
+
+    if current.strip():
+        parts.append(current.strip())
+
+    return parts
